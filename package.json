@@ -1,16 +1,93 @@
 {
   "name": "cors-bridge",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Local CORS-fixing reverse proxy with a certificate manager and helpers for the Android emulator and iOS Simulator",
-  "main": "server.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
+    "app": "electron .",
     "test": "node test/run.js",
+    "test:electron": "node scripts/test-electron.js",
+    "icons": "electron scripts/make-icons.js",
     "build": "node scripts/build-sea.js",
-    "build:all": "node scripts/build-sea.js all"
+    "build:all": "node scripts/build-sea.js all",
+    "app:mac": "electron-builder --mac",
+    "app:win": "electron-builder --win",
+    "app:all": "electron-builder --mac --win"
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "author": "Nevin Paul",
+  "build": {
+    "appId": "io.github.nevin.cors-bridge",
+    "productName": "CORS Bridge",
+    "copyright": "MIT License",
+    "directories": {
+      "output": "dist/app",
+      "buildResources": "assets"
+    },
+    "files": [
+      "electron/**",
+      "lib/**",
+      "public/**",
+      "assets/trayTemplate*.png",
+      "assets/tray-windows.png",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "artifactName": "CORS-Bridge-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "CORS-Bridge-${version}-windows-portable-${arch}.${ext}"
+    },
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "enableCookieEncryption": true,
+      "grantFileProtocolExtraPrivileges": false
+    }
+  }
 }

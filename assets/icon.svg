@@ -1,1 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect x="100" y="100" width="824" height="824" rx="185" fill="#1f5fbf"/><g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" transform="translate(172 160) scale(17)"><path d="M3 28h34M7 28c0-9 5-14 13-14s13 5 13 14M12 28v-6M20 28V14M28 28v-6"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs><linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9eff4"/></linearGradient></defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" stroke="#d3dde6" stroke-width="4"/>
+  <svg x="172" y="262" width="680" height="508" viewBox="20 26 730 545">
+  
+  <defs>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1fcf92"/>
+      <stop offset="1" stop-color="#0c9a6a"/>
+    </linearGradient>
+  </defs>
+  <!-- back window -->
+  <g transform="matrix(1 -0.21 0 1 0 0)">
+    <rect class="navy" x="40" y="150" width="360" height="410" rx="34" fill="#0f2742"/>
+    <rect class="navy-panel" x="72" y="230" width="296" height="298" rx="16" fill="#d5e1ed"/>
+    <circle class="cut-fill" cx="94" cy="192" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="138" cy="192" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="182" cy="192" r="13" fill="#ffffff"/>
+  </g>
+  <!-- front window -->
+  <g transform="matrix(1 -0.21 0 1 0 0)">
+    <rect class="cut" x="330" y="205" width="400" height="415" rx="36" fill="url(#green)" stroke="#ffffff" stroke-width="14"/>
+    <rect class="green-panel" x="362" y="286" width="336" height="302" rx="16" fill="#e3f6ee"/>
+    <circle class="cut-fill" cx="610" cy="246" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="654" cy="246" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="698" cy="246" r="13" fill="#ffffff"/>
+  </g>
+  <!-- arrows: requests go to the server (green), answers come back with CORS headers (navy) -->
+  <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path class="cut" d="M190 372 C300 372 352 262 470 262 L520 262" stroke="#ffffff" stroke-width="72"/>
+    <path class="cut" d="M590 318 C480 318 428 428 300 428 L250 428" stroke="#ffffff" stroke-width="72"/>
+    <path class="cut-fill cut" d="M500 196 L610 262 L500 328 Z" fill="#ffffff" stroke="#ffffff" stroke-width="22"/>
+    <path class="cut-fill cut" d="M270 362 L160 428 L270 494 Z" fill="#ffffff" stroke="#ffffff" stroke-width="22"/>
+    <path d="M190 372 C300 372 352 262 470 262 L520 262" stroke="url(#green)" stroke-width="48"/>
+    <path d="M500 206 L596 262 L500 318 Z" fill="url(#green)" stroke="url(#green)" stroke-width="8"/>
+    <path class="navy-stroke" d="M590 318 C480 318 428 428 300 428 L250 428" stroke="#0f2742" stroke-width="48"/>
+    <path class="navy navy-stroke" d="M270 372 L174 428 L270 484 Z" fill="#0f2742" stroke="#0f2742" stroke-width="8"/>
+  </g>
+</svg>
+</svg>

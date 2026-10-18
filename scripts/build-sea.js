@@ -6,11 +6,8 @@
 //   node scripts/build-sea.js win-x64 linux-x64 darwin-arm64
 //   node scripts/build-sea.js all
 //
-// What comes out in dist/ (none of it needs installing; run it from any folder, also from a USB stick):
-//   Windows  cors-bridge-win-x64.exe        opens no console window; messages go to a log file
-//   macOS    CORS-Bridge-macos-arm64.zip    contains "CORS Bridge.app" (double-click, no Terminal window)
-//            cors-bridge-macos-arm64        the plain program, for running from a terminal
-//   Linux    cors-bridge-linux-x64          run from a terminal
+// These are the command-line programs (run in a terminal, dashboard in the browser). The desktop app with its own
+// window is built with electron-builder instead: npm run app:mac / app:win.
 //
 // Every binary contains the Node version that runs this script. Binaries for other platforms are made from the
 // official Node download for that platform (checked against nodejs.org's SHASUMS256.txt). macOS binaries must be
@@ -19,7 +16,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
-const { setSubsystem } = require('./pe-subsystem');
 
 const ROOT = path.join(__dirname, '..');
 const BUILD = path.join(ROOT, 'build');
@@ -153,95 +149,7 @@ async function buildTarget(target, blob) {
   if (isMac(target)) args.push('--macho-segment-name', 'NODE_SEA');
   run('npx', args);
   if (isMac(target)) run('codesign', ['--sign', '-', out]); // ad-hoc signature; use a Developer ID to distribute
-  if (isWin(target)) {
-    const buf = fs.readFileSync(out);
-    setSubsystem(buf, 'gui');
-    fs.writeFileSync(out, buf);
-  }
   console.log(`  -> ${path.relative(ROOT, out)}`);
-  if (isMac(target)) macApp(target, out);
-}
-
-// ------------------------------------------------------------------ macOS app
-
-const APP_NAME = 'CORS Bridge';
-const pkg = require('../package.json');
-
-// Makes AppIcon.icns from assets/icon.svg with tools that come with macOS. Returns null if that fails.
-let icns;
-function appIcon() {
-  if (icns !== undefined) return icns;
-  icns = null;
-  try {
-    const work = path.join(BUILD, 'icon');
-    fs.rmSync(work, { recursive: true, force: true });
-    const set = path.join(work, 'AppIcon.iconset');
-    fs.mkdirSync(set, { recursive: true });
-    execFileSync('qlmanage', ['-t', '-s', '1024', '-o', work, path.join(ROOT, 'assets', 'icon.svg')], { stdio: 'ignore' });
-    const big = path.join(work, 'icon.svg.png');
-    for (const size of [16, 32, 128, 256, 512]) {
-      execFileSync('sips', ['-z', String(size), String(size), big, '--out', path.join(set, `icon_${size}x${size}.png`)], { stdio: 'ignore' });
-      execFileSync('sips', ['-z', String(size * 2), String(size * 2), big, '--out', path.join(set, `icon_${size}x${size}@2x.png`)], { stdio: 'ignore' });
-    }
-    const out = path.join(work, 'AppIcon.icns');
-    execFileSync('iconutil', ['-c', 'icns', set, '-o', out], { stdio: 'ignore' });
-    icns = out;
-  } catch (e) {
-    console.log(`  (no app icon: ${e.message.split('\n')[0]})`);
-  }
-  return icns;
-}
-
-function infoPlist(hasIcon) {
-  const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const entries = {
-    CFBundleName: APP_NAME,
-    CFBundleDisplayName: APP_NAME,
-    CFBundleIdentifier: 'io.github.nevin.cors-bridge',
-    CFBundleExecutable: 'cors-bridge',
-    CFBundlePackageType: 'APPL',
-    CFBundleShortVersionString: pkg.version,
-    CFBundleVersion: pkg.version,
-    LSMinimumSystemVersion: '11.0',
-    // No Dock icon: the dashboard in the browser is the window, and its Quit button ends the app.
-    LSUIElement: true,
-    NSHighResolutionCapable: true,
-  };
-  if (hasIcon) entries.CFBundleIconFile = 'AppIcon';
-  const body = Object.entries(entries)
-    .map(([k, v]) => `  <key>${k}</key>\n  ${v === true ? '<true/>' : `<string>${esc(v)}</string>`}`)
-    .join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-${body}
-</dict>
-</plist>
-`;
-}
-
-// Wraps the program in "CORS Bridge.app" so it opens with a double-click and without a Terminal window,
-// then zips it (ditto keeps the app's signature and permissions intact).
-function macApp(target, binary) {
-  const name = target.replace('darwin', 'macos');
-  const folder = path.join(DIST, name);
-  const app = path.join(folder, `${APP_NAME}.app`);
-  fs.rmSync(folder, { recursive: true, force: true });
-  fs.mkdirSync(path.join(app, 'Contents', 'MacOS'), { recursive: true });
-  fs.mkdirSync(path.join(app, 'Contents', 'Resources'), { recursive: true });
-  fs.copyFileSync(binary, path.join(app, 'Contents', 'MacOS', 'cors-bridge'));
-  fs.chmodSync(path.join(app, 'Contents', 'MacOS', 'cors-bridge'), 0o755);
-  const icon = appIcon();
-  if (icon) fs.copyFileSync(icon, path.join(app, 'Contents', 'Resources', 'AppIcon.icns'));
-  fs.writeFileSync(path.join(app, 'Contents', 'Info.plist'), infoPlist(!!icon));
-  run('codesign', ['--force', '--deep', '--sign', '-', app]);
-  run('codesign', ['--verify', '--deep', '--strict', app]);
-  const zip = path.join(DIST, `CORS-Bridge-${name}.zip`);
-  fs.rmSync(zip, { force: true });
-  run('ditto', ['-c', '-k', '--keepParent', app, zip]);
-  console.log(`  -> ${path.relative(ROOT, app)}`);
-  console.log(`  -> ${path.relative(ROOT, zip)}`);
 }
 
 async function main() {

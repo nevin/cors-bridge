@@ -376,6 +376,9 @@ function request(opts, body) {
     const page = await call('GET', '/', null, { cookie: '' });
     eq(page.status, 401);
     ok(/text\/html/.test(page.headers['content-type']) && /Dashboard:/.test(page.body) && /prefers-color-scheme: dark/.test(page.body));
+    ok(page.body.includes('<svg') && page.body.includes('aria-hidden="true"'), 'the logo is built into the page (it cannot load files without the token)');
+    const logo = await call('GET', '/logo.svg');
+    ok(logo.status === 200 && /image\/svg\+xml/.test(logo.headers['content-type']), 'the dashboard serves its logo');
     const j = await call('GET', '/api/state', null, { cookie: '' });
     ok(/Session expired/.test(JSON.parse(j.body).error));
   });
@@ -410,6 +413,26 @@ function request(opts, body) {
     await call('POST', '/api/proxy/stop');
     r = await call('DELETE', `/api/rules/${id}`);
     eq(JSON.parse(r.body).state.rules.length, 0);
+  });
+  await test('the event stream tells the dashboard when the proxy starts or stops', async () => {
+    const events = [];
+    const req = http.request({ host: '127.0.0.1', port: apiPort, path: '/api/events', headers: { host: `127.0.0.1:${apiPort}`, cookie: `cb_token=${token}` } });
+    await new Promise((resolve) => {
+      req.on('response', (res) => {
+        res.setEncoding('utf8');
+        res.on('data', (d) => events.push(d));
+        resolve();
+      });
+      req.end();
+    });
+    store.save({ ...store.load(), rules: [store.normalizeRule({ hostInput: 'https://sse.test.local:18446', upstreamHost: '127.0.0.1', upstreamScheme: 'http', upstreamPort: 19080 })] });
+    await engine2.start();
+    await engine2.stop();
+    await new Promise((r) => setTimeout(r, 100));
+    req.destroy();
+    const text = events.join('');
+    ok(/event: status\ndata: \{"running":true/.test(text) && /event: status\ndata: \{"running":false/.test(text), text);
+    store.save({ ...store.load(), rules: [] });
   });
   await test('certificate download formats', async () => {
     const pem = await call('GET', `/api/certs/${ca.id}/download?format=pem`);
@@ -644,7 +667,10 @@ exit 0
     child.stdout.on('data', (d) => (outText += d));
     child.stderr.on('data', (d) => (outText += d));
     await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`did not start: ${outText}`)), 10000);
+      const t = setTimeout(() => {
+        child.kill('SIGKILL'); // never leave a test copy running
+        reject(new Error(`did not start: ${outText}`));
+      }, 10000);
       child.stdout.on('data', () => outText.includes('Dashboard:') && (clearTimeout(t), resolve()));
     });
     eq(JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8')).settings.allowLan, false);
@@ -671,6 +697,8 @@ exit 0
     // started with node: the folder sits in the project folder
     fs.mkdirSync(path.join(root, 'project', 'cors-bridge-data'), { recursive: true });
     eq(P.resolveDataDir({ env: {}, sea: false, projectDir: path.join(root, 'project'), home }).portable, true);
+    // the desktop app says where it is (a Windows portable .exe runs from a temporary copy)
+    eq(P.resolveDataDir({ env: { CORS_BRIDGE_APP_DIR: path.join(root, 'usb') }, execPath: '/tmp/x/CORS Bridge.exe', sea: false, home }).dir, path.join(root, 'usb', 'cors-bridge-data'));
   });
   await test('running copy is found only when it answers with its token', async () => {
     const inst = require('../lib/instance');
@@ -719,7 +747,10 @@ exit 0
     };
     const first = start();
     await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`did not start: ${first.text}`)), 10000);
+      const t = setTimeout(() => {
+        first.kill('SIGKILL'); // never leave a test copy running
+        reject(new Error(`did not start: ${first.text}`));
+      }, 10000);
       first.stdout.on('data', () => first.text.includes('Dashboard:') && (clearTimeout(t), resolve()));
     });
     const info = JSON.parse(fs.readFileSync(path.join(home, 'instance.json'), 'utf8'));
@@ -732,23 +763,6 @@ exit 0
     eq(r.status, 200, r.body);
     eq(await first.done, 0);
     ok(!fs.existsSync(path.join(home, 'instance.json')), 'the token file is removed on quit');
-  });
-
-  await test('Windows build: the program is marked as windowed (no console window)', async () => {
-    const { setSubsystem } = require('../scripts/pe-subsystem');
-    for (const magic of [0x10b, 0x20b]) {
-      const buf = Buffer.alloc(512);
-      buf.writeUInt16LE(0x5a4d, 0); // MZ
-      buf.writeUInt32LE(0x80, 0x3c); // where the PE header starts
-      buf.writeUInt32LE(0x00004550, 0x80); // PE\0\0
-      buf.writeUInt16LE(magic, 0x80 + 24);
-      buf.writeUInt16LE(3, 0x80 + 24 + 68); // console
-      eq(setSubsystem(buf, 'gui'), 3);
-      eq(buf.readUInt16LE(0x80 + 24 + 68), 2);
-    }
-    let threw = false;
-    try { setSubsystem(Buffer.from('#!/bin/sh\n'.padEnd(200))); } catch { threw = true; }
-    ok(threw, 'refuses files that are not Windows programs');
   });
 
   api.close();

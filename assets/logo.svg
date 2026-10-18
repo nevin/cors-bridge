@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-label="CORS Bridge">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .navy { fill: #9cc3ea; }
+      .navy-stroke { stroke: #9cc3ea; }
+      .navy-panel { fill: #1d3a57; }
+      .green-panel { fill: #144d3b; }
+      .cut { stroke: #16242e; }
+      .cut-fill { fill: #16242e; }
+      .word-navy { fill: #9cc3ea; }
+    }
+  </style>
+  <svg x="190" y="20" width="520" height="388" viewBox="20 26 730 545">
+  
+  <defs>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1fcf92"/>
+      <stop offset="1" stop-color="#0c9a6a"/>
+    </linearGradient>
+  </defs>
+  <!-- back window -->
+  <g transform="matrix(1 -0.21 0 1 0 0)">
+    <rect class="navy" x="40" y="150" width="360" height="410" rx="34" fill="#0f2742"/>
+    <rect class="navy-panel" x="72" y="230" width="296" height="298" rx="16" fill="#d5e1ed"/>
+    <circle class="cut-fill" cx="94" cy="192" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="138" cy="192" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="182" cy="192" r="13" fill="#ffffff"/>
+  </g>
+  <!-- front window -->
+  <g transform="matrix(1 -0.21 0 1 0 0)">
+    <rect class="cut" x="330" y="205" width="400" height="415" rx="36" fill="url(#green)" stroke="#ffffff" stroke-width="14"/>
+    <rect class="green-panel" x="362" y="286" width="336" height="302" rx="16" fill="#e3f6ee"/>
+    <circle class="cut-fill" cx="610" cy="246" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="654" cy="246" r="13" fill="#ffffff"/>
+    <circle class="cut-fill" cx="698" cy="246" r="13" fill="#ffffff"/>
+  </g>
+  <!-- arrows: requests go to the server (green), answers come back with CORS headers (navy) -->
+  <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path class="cut" d="M190 372 C300 372 352 262 470 262 L520 262" stroke="#ffffff" stroke-width="72"/>
+    <path class="cut" d="M590 318 C480 318 428 428 300 428 L250 428" stroke="#ffffff" stroke-width="72"/>
+    <path class="cut-fill cut" d="M500 196 L610 262 L500 328 Z" fill="#ffffff" stroke="#ffffff" stroke-width="22"/>
+    <path class="cut-fill cut" d="M270 362 L160 428 L270 494 Z" fill="#ffffff" stroke="#ffffff" stroke-width="22"/>
+    <path d="M190 372 C300 372 352 262 470 262 L520 262" stroke="url(#green)" stroke-width="48"/>
+    <path d="M500 206 L596 262 L500 318 Z" fill="url(#green)" stroke="url(#green)" stroke-width="8"/>
+    <path class="navy-stroke" d="M590 318 C480 318 428 428 300 428 L250 428" stroke="#0f2742" stroke-width="48"/>
+    <path class="navy navy-stroke" d="M270 372 L174 428 L270 484 Z" fill="#0f2742" stroke="#0f2742" stroke-width="8"/>
+  </g>
+</svg>
+  <text x="450" y="525" text-anchor="middle" font-family="'Arial Black','Helvetica Neue',Arial,sans-serif" font-weight="900" font-size="92" letter-spacing="1"><tspan class="word-navy" fill="#0f2742">CORS </tspan><tspan fill="#0e9f6e">BRIDGE</tspan></text>
+</svg>
