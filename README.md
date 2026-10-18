@@ -24,14 +24,19 @@ App (simulator) --> CORS Bridge (this computer) --> real server
 
 ## Start
 
-**Desktop app (recommended).** Nothing to install. Take the file for your system from the GitHub release (or from
-`dist/app` after building), put it in any folder, also on a USB stick, and open it:
+**Desktop app (recommended).** Nothing to install. Download the file for your system from the
+[latest release](https://github.com/nevin/cors-bridge/releases/latest) (or take it from `dist/app` after building),
+put it in any folder, also on a USB stick, and open it:
 
 | System | File | How to open |
 | --- | --- | --- |
-| macOS, Apple silicon / Intel | `CORS-Bridge-<version>-mac-arm64.zip` / `-mac-x64.zip` | Unzip, double-click **CORS Bridge.app** |
-| Windows, any PC | `CORS-Bridge-<version>-windows-portable.exe` (works on Intel/AMD and ARM) | Double-click |
-| Windows, smaller download | `...-windows-portable-x64.exe` / `-arm64.exe`, or the `-win-x64.zip` / `-win-arm64.zip` folder | Double-click / unzip and open `CORS Bridge.exe` |
+| Mac with Apple silicon (M1 or later) | `CORS-Bridge-<version>-mac-arm64.zip` | Unzip, then see *Opening the app on macOS* below |
+| Mac with an Intel processor | `CORS-Bridge-<version>-mac-x64.zip` | Unzip, then see *Opening the app on macOS* below |
+| Windows, any PC (Intel/AMD or ARM) | `CORS-Bridge-<version>-windows-portable.exe` | Double-click |
+| Windows, faster start | `CORS-Bridge-<version>-win-x64.zip` (ARM PCs: `-win-arm64.zip`) | Unzip, open `CORS Bridge.exe` |
+
+Not sure which Mac you have? Apple menu > **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel"
+means Intel.
 
 The dashboard opens in its own window, and a CORS Bridge icon appears in the menu bar (macOS) or the taskbar tray
 (Windows) with **Start proxy**, **Stop proxy** and **Quit**. Closing the window keeps the proxy running; open it again
@@ -39,17 +44,55 @@ from that icon or by opening the app again. **Quit** (in the icon's menu, in the
 and removes the hosts redirect if that is turned on in Settings. Messages go to `cors-bridge.log` in the data folder
 (shown in Settings).
 
-The first time, macOS may say the app cannot be checked: right-click it, choose **Open**, then **Open** again.
-Windows SmartScreen may show "Windows protected your PC": choose **More info**, then **Run anyway**. This happens because
-the files are not signed with a paid developer certificate (see *Building*). The Windows portable `.exe` unpacks itself
-to a temporary folder each time it starts, so it takes a few seconds; the zip version starts faster.
+### Opening the app on macOS
 
-**Command-line program.** For Linux, or if you prefer a terminal: `cors-bridge-linux-x64`, `cors-bridge-macos-arm64`,
+CORS Bridge is not signed with an Apple Developer ID yet, so macOS blocks it the first time you open it. You only do
+this once per Mac (and again after downloading a new version):
+
+1. Double-click the downloaded zip. Drag **CORS Bridge.app** into **Applications** (or any other folder; for portable
+   mode, next to your `cors-bridge-data` folder). Do this before the first start, see *Portable mode*.
+2. Double-click **CORS Bridge.app**. macOS says it "Not Opened" or "cannot be opened because Apple cannot check it".
+   Click **Done** (not *Move to Trash*).
+3. Open **System Settings > Privacy & Security**. Scroll down to the message saying CORS Bridge was blocked and click
+   **Open Anyway**. Enter your password, then click **Open Anyway** (or **Open**) once more.
+
+From then on it opens with a double-click. On macOS 14 (Sonoma) and earlier you can instead right-click the app, choose
+**Open**, then **Open** again.
+
+If you are comfortable with Terminal, this does the same in one step (it removes the "downloaded from the internet"
+mark that macOS checks):
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/CORS Bridge.app"
+```
+
+Only do this for a copy you downloaded from this project's GitHub releases. To make sure the download is the original,
+compare its checksum with the one in `SHA256SUMS.txt` on the release page:
+
+```bash
+shasum -a 256 ~/Downloads/CORS-Bridge-*-mac-*.zip
+```
+
+If macOS says the app "is damaged and can't be opened", the download was changed or incomplete: delete it and download
+it again.
+
+### Opening the app on Windows
+
+Windows SmartScreen may show "Windows protected your PC": choose **More info**, then **Run anyway**. This happens because
+the files are not signed with a code-signing certificate yet (see *Building*). To check the download in PowerShell:
+`Get-FileHash .\CORS-Bridge-*-windows-portable.exe` and compare with `SHA256SUMS.txt`. The portable `.exe` unpacks
+itself to a temporary folder each time it starts, so it takes a few seconds; the zip version starts faster.
+
+### Command-line program
+
+For Linux, or if you prefer a terminal: `cors-bridge-linux-x64`, `cors-bridge-macos-arm64`,
 `cors-bridge-win-x64.exe` and the other files in `dist/` after `npm run build:all`. They run in a terminal and open the
 dashboard in your browser. Add `--no-open` to stop the browser from opening, and `--console` to keep messages on the
 terminal even when the output is redirected. Press Ctrl+C or **Quit** in the dashboard to stop.
 
-**Portable mode.** Your rules, certificates and private keys are normally kept in `~/.cors-bridge`
+### Portable mode
+
+Your rules, certificates and private keys are normally kept in `~/.cors-bridge`
 (`%USERPROFILE%\.cors-bridge` on Windows). To keep them next to the app instead, for example on a USB stick, create a
 folder named `cors-bridge-data` in the same folder as the app (next to `CORS Bridge.app` on macOS, next to the `.exe`
 on Windows) and start the app. Settings shows which folder is in use. Keep in mind that this folder then holds your CA
@@ -57,7 +100,8 @@ private key: anyone who copies it can read the traffic of every simulator that t
 only you use. On macOS, move the app out of the folder you unzipped it in (or into Applications) first; otherwise
 macOS runs it from a temporary copy and the folder next to it cannot be found. `CORS_BRIDGE_HOME` overrides both.
 
-**With Node:**
+### Running from source (with Node)
+
 
 - Windows: double-click `start.bat`
 - macOS: double-click `start.command` (or run `./start.command` in a terminal)
