@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 const crypto = require('crypto');
-const { spawn } = require('child_process');
 const store = require('./lib/store');
 const hosts = require('./lib/hosts');
 const P = require('./lib/paths');
+const instance = require('./lib/instance');
+const desktop = require('./lib/desktop');
 const { ProxyEngine } = require('./lib/proxy');
 const { createApiServer } = require('./lib/api');
 
@@ -14,19 +15,23 @@ if (major < 18) {
   process.exit(1);
 }
 
-function openBrowser(url) {
-  try {
-    if (process.platform === 'darwin') spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
-    else if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '""', url], { stdio: 'ignore', detached: true, windowsHide: true }).unref();
-    else spawn('xdg-open', [url], { stdio: 'ignore', detached: true }).unref();
-  } catch {
-    /* the URL is printed anyway */
-  }
-}
+// Started from Finder or Explorer there is no window to print to, so messages go to a log file in the data folder.
+const headless = desktop.headless();
 
 async function main() {
   P.ensureDirs();
+  if (headless) desktop.useLogFile(P.LOG_FILE);
   const args = process.argv.slice(2);
+  const open = !args.includes('--no-open');
+
+  // Started a second time (for example by double-clicking the app again): show the dashboard of the running copy.
+  const running = await instance.findRunning();
+  if (running) {
+    console.log(`  CORS Bridge is already running. Dashboard: ${instance.dashboardUrl(running)}`);
+    if (open) desktop.openBrowser(instance.dashboardUrl(running));
+    process.exit(0);
+  }
+
   const token = process.env.CORS_BRIDGE_TOKEN || crypto.randomBytes(24).toString('hex');
   const engine = new ProxyEngine({
     getRules: () => store.load().rules,
@@ -40,10 +45,10 @@ async function main() {
     console.log('  Note: "Let other devices on my network use the proxy" was turned off. Turn it on again in Settings if you still need it.');
   }
   let port = Number(process.env.CORS_BRIDGE_UI_PORT) || store.load().settings.uiPort;
-  const server = createApiServer({ engine, token, getPort: () => port });
 
   // A redirect left behind points the API host names at this computer while nothing answers there (or while
-  // another program does), so remove it however CORS Bridge ends: Ctrl+C, closing the window, or a crash.
+  // another program does), so remove it however CORS Bridge ends: the Quit button, Ctrl+C, closing the window,
+  // or a crash.
   let closing = false;
   const shutdown = async (code = 0) => {
     if (closing) return;
@@ -58,6 +63,7 @@ async function main() {
     } catch (e) {
       console.error(`  Could not remove the hosts-file redirect: ${e.message}`);
     }
+    instance.clear();
     process.exit(code);
   };
   process.on('SIGINT', () => shutdown(0));
@@ -71,6 +77,7 @@ async function main() {
   process.on('uncaughtException', crashed);
   process.on('unhandledRejection', crashed);
 
+  const server = createApiServer({ engine, token, getPort: () => port, onQuit: () => shutdown(0) });
   await new Promise((resolve, reject) => {
     let tries = 0;
     const attempt = () => {
@@ -84,14 +91,16 @@ async function main() {
     };
     attempt();
   });
+  instance.write({ pid: process.pid, port, token, startedAt: new Date().toISOString() });
 
   const url = `http://127.0.0.1:${port}/?token=${token}`;
   console.log('');
   console.log('  CORS Bridge is running.');
   console.log(`  Dashboard: ${url}`);
-  console.log('  Leave this window open while you test. Press Ctrl+C to quit.');
+  if (P.PORTABLE) console.log(`  Portable mode: data is kept in ${P.DATA_DIR}`);
+  if (!headless) console.log('  Leave this window open while you test. Press Ctrl+C or the Quit button in the dashboard to quit.');
   console.log('');
-  if (!args.includes('--no-open')) openBrowser(url);
+  if (open) desktop.openBrowser(url);
 
   const cfg = store.load();
   if (cfg.settings.autoStartProxy && cfg.rules.some((r) => r.enabled)) {
@@ -101,8 +110,6 @@ async function main() {
     );
   }
 
-
-
   if (hosts.status().entries.length) {
     console.log('  Note: a hosts-file redirect from an earlier session is still active on this computer.');
     console.log('  Remove it from the Devices tab when you are done, or that host name will keep pointing at the proxy.\n');
@@ -111,5 +118,6 @@ async function main() {
 
 main().catch((e) => {
   console.error(e.message || e);
+  if (headless) desktop.showError('CORS Bridge could not start', `${e.message || e}\n\nDetails are in ${P.LOG_FILE}`);
   process.exit(1);
 });

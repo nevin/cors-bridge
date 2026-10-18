@@ -21,16 +21,34 @@ App (simulator) --> CORS Bridge (this computer) --> real server
 
 ## Start
 
-**Without Node (standalone executable):** run the file for your system from `dist/` (see *Building the executables*).
+**As an app (nothing to install, no Node needed).** Take the file for your system from `dist/` or from the
+GitHub release, put it in any folder (or on a USB stick) and open it:
 
-| System | File |
-| --- | --- |
-| Windows (Intel/AMD, ARM) | `cors-bridge-win-x64.exe`, `cors-bridge-win-arm64.exe` |
-| macOS (Apple silicon, Intel) | `cors-bridge-macos-arm64`, `cors-bridge-macos-x64` |
-| Linux (x64, ARM) | `cors-bridge-linux-x64`, `cors-bridge-linux-arm64` |
+| System | File | How to open |
+| --- | --- | --- |
+| macOS (Apple silicon, Intel) | `CORS-Bridge-macos-arm64.zip`, `CORS-Bridge-macos-x64.zip` | Unzip, double-click **CORS Bridge.app** |
+| Windows (Intel/AMD, ARM) | `cors-bridge-win-x64.exe`, `cors-bridge-win-arm64.exe` | Double-click |
+| Linux (x64, ARM) | `cors-bridge-linux-x64`, `cors-bridge-linux-arm64` | Run it in a terminal |
 
-The executables trust the certificates installed in your operating system for the real server, like the start
-scripts below. Add `--no-open` to stop the browser from opening.
+The dashboard opens in your browser. There is no terminal window on macOS and Windows. To stop CORS Bridge, press
+**Quit** at the top of the dashboard. Opening the app again while it runs just shows the dashboard again. Messages go
+to `cors-bridge.log` in the data folder (shown in Settings), and an error that stops it from starting is shown in a
+message box.
+
+The first time, macOS may say the app cannot be checked: right-click it, choose **Open**, then **Open** again.
+Windows SmartScreen may show "Windows protected your PC": choose **More info**, then **Run anyway**. This happens because
+the files are not signed with a paid developer certificate (see *Building the executables*).
+
+The plain macOS program (`cors-bridge-macos-arm64`) still runs in a terminal, like on Linux. Add `--no-open` to stop
+the browser from opening, and `--console` to print messages to the terminal even when the output is redirected.
+
+**Portable mode.** Your rules, certificates and private keys are normally kept in `~/.cors-bridge`
+(`%USERPROFILE%\.cors-bridge` on Windows). To keep them next to the app instead, for example on a USB stick, create a
+folder named `cors-bridge-data` in the same folder as the app (next to `CORS Bridge.app` on macOS) and start the app.
+Settings shows which folder is in use. Keep in mind that this folder then holds your CA private key: anyone who copies
+it can read the traffic of every simulator that trusts your CA, so keep it on a drive only you use. On macOS, move the
+app out of the folder you unzipped it in (or into Applications) first; otherwise macOS runs it from a temporary copy and
+the folder next to it cannot be found. `CORS_BRIDGE_HOME` still overrides both.
 
 **With Node:**
 
@@ -38,7 +56,8 @@ scripts below. Add `--no-open` to stop the browser from opening.
 - macOS: double-click `start.command` (or run `./start.command` in a terminal)
 - Anywhere: `node server.js`
 
-A browser tab opens with the dashboard. Keep the terminal window open while you test.
+A browser tab opens with the dashboard. Keep the terminal window open while you test, or press **Quit** in the
+dashboard. With Node, portable mode uses a `cors-bridge-data` folder in the project folder.
 
 ## Use
 
@@ -132,7 +151,9 @@ npm run build        # this computer only
 npm run build:all    # all six (macOS ones only when building on a Mac)
 ```
 
-Output goes to `dist/`. Each executable contains the Node version that runs the build, so build with a supported LTS
+Output goes to `dist/`: for macOS an app (`macos-arm64/CORS Bridge.app`), its zip and the plain program; for
+Windows an `.exe` that opens without a console window; for Linux the plain program. The macOS app icon is made from
+`assets/icon.svg` with tools that come with macOS (`qlmanage`, `sips`, `iconutil`). Each executable contains the Node version that runs the build, so build with a supported LTS
 release (currently Node 22). The script bundles `server.js` and `lib/`, embeds `public/`, and injects them into Node
 with `postject` (fetched through `npx`). For other platforms it downloads the official Node build from nodejs.org and
 checks it against `SHASUMS256.txt`; downloads are cached in `build/node-cache`.
@@ -148,5 +169,6 @@ Signing before sharing the files:
 
 ## Tests
 
-`npm test` runs 21 checks: certificates (verified with OpenSSL), the proxy and CORS behaviour, WebSockets, the
-hosts-file editing, dashboard security and the Android flow against a fake `adb`.
+`npm test` runs 43 checks: certificates (verified with OpenSSL), the proxy and CORS behaviour, WebSockets, the
+hosts-file editing, dashboard security, import/export, the Android and iOS flows against a fake `adb` and `xcrun`,
+portable mode, the single running copy, Quit, and the Windows build patch.

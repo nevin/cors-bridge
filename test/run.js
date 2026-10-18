@@ -636,7 +636,7 @@ exit 0
     fs.writeFileSync(path.join(home, 'config.json'), JSON.stringify({ settings: { allowLan: true, lanClients: ['192.168.1.20'] }, rules: [] }));
     fs.writeFileSync(hostsFile, hosts.buildContent('127.0.0.1 localhost\n', [{ ip: '127.0.0.1', host: 'api.test.local' }]));
     const { spawn } = require('child_process');
-    const child = spawn(process.execPath, [path.join(__dirname, '..', 'server.js'), '--no-open'], {
+    const child = spawn(process.execPath, [path.join(__dirname, '..', 'server.js'), '--no-open', '--console'], {
       env: { ...process.env, CORS_BRIDGE_HOME: home, CORS_BRIDGE_HOSTS_FILE: hostsFile, CORS_BRIDGE_UI_PORT: '17891' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -652,6 +652,103 @@ exit 0
     child.kill('SIGHUP');
     await exited;
     eq(fs.readFileSync(hostsFile, 'utf8'), '127.0.0.1 localhost\n', outText);
+  });
+
+  await test('portable mode: a cors-bridge-data folder next to the app is used for the data', async () => {
+    const P = require('../lib/paths');
+    const root = fs.mkdtempSync(path.join(tmp, 'portable-'));
+    const home = path.join(root, 'home');
+    eq(P.resolveDataDir({ env: { CORS_BRIDGE_HOME: '/x' }, home }).dir, '/x', 'CORS_BRIDGE_HOME wins');
+    const exe = path.join(root, 'usb', 'cors-bridge.exe');
+    eq(P.resolveDataDir({ env: {}, execPath: exe, sea: true, home }).dir, path.join(home, '.cors-bridge'), 'no folder: home');
+    fs.mkdirSync(path.join(root, 'usb', 'cors-bridge-data'), { recursive: true });
+    const r = P.resolveDataDir({ env: {}, execPath: exe, sea: true, home });
+    eq(r.dir, path.join(root, 'usb', 'cors-bridge-data'));
+    eq(r.portable, true);
+    // macOS: the program sits inside the .app, the folder sits next to the .app
+    eq(P.appFolder('/Volumes/USB/CORS Bridge.app/Contents/MacOS/cors-bridge'), '/Volumes/USB');
+    eq(P.appFolder('/Volumes/USB/cors-bridge-macos-arm64'), '/Volumes/USB');
+    // started with node: the folder sits in the project folder
+    fs.mkdirSync(path.join(root, 'project', 'cors-bridge-data'), { recursive: true });
+    eq(P.resolveDataDir({ env: {}, sea: false, projectDir: path.join(root, 'project'), home }).portable, true);
+  });
+  await test('running copy is found only when it answers with its token', async () => {
+    const inst = require('../lib/instance');
+    const file = path.join(tmp, 'instance.json');
+    inst.write({ pid: process.ppid, port: apiPort, token }, file);
+    eq(fs.statSync(file).mode & 0o777, 0o600, 'the token file is private');
+    const found = await inst.findRunning(file);
+    ok(found && found.port === apiPort, 'the running dashboard is found');
+    inst.write({ pid: process.ppid, port: apiPort, token: 'wrong' }, file);
+    eq(await inst.findRunning(file), null, 'another program on that port is not mistaken for it');
+    inst.write({ pid: 999999, port: apiPort, token }, file);
+    eq(await inst.findRunning(file), null, 'a process that ended is ignored');
+    inst.clear(999999, file);
+    ok(!fs.existsSync(file));
+  });
+  await test('Quit answers, then shuts down', async () => {
+    eq((await call('POST', '/api/quit')).status, 400, 'not offered without a way to quit');
+    let quit = 0;
+    let qPort;
+    const qApi = createApiServer({ engine: engine2, token, getPort: () => qPort, onQuit: () => quit++ });
+    await new Promise((r) => qApi.listen(0, '127.0.0.1', r));
+    qPort = qApi.address().port;
+    const r = await request({ host: '127.0.0.1', port: qPort, path: '/api/quit', method: 'POST', headers: { host: `127.0.0.1:${qPort}`, cookie: `cb_token=${token}`, 'content-type': 'application/json' } });
+    eq(r.status, 200, r.body);
+    eq(quit, 0, 'the answer comes first');
+    await new Promise((res) => setTimeout(res, 200));
+    eq(quit, 1);
+    const st = await request({ host: '127.0.0.1', port: qPort, path: '/api/state', method: 'GET', headers: { host: `127.0.0.1:${qPort}`, cookie: `cb_token=${token}` } });
+    eq(JSON.parse(st.body).platform.canQuit, true);
+    qApi.close();
+  });
+  await test('starting a second time opens the running copy instead; Quit stops it and cleans up', async () => {
+    if (process.platform === 'win32') return console.log('       (skipped on Windows)');
+    const home = path.join(tmp, 'twice');
+    const hostsFile = path.join(tmp, 'twice-hosts');
+    fs.writeFileSync(hostsFile, '127.0.0.1 localhost\n');
+    const { spawn } = require('child_process');
+    const env = { ...process.env, CORS_BRIDGE_HOME: home, CORS_BRIDGE_HOSTS_FILE: hostsFile, CORS_BRIDGE_UI_PORT: '17893' };
+    const start = () => {
+      const c = spawn(process.execPath, [path.join(__dirname, '..', 'server.js'), '--no-open', '--console'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+      c.text = '';
+      c.stdout.on('data', (d) => (c.text += d));
+      c.stderr.on('data', (d) => (c.text += d));
+      c.done = new Promise((resolve) => c.on('exit', resolve));
+      return c;
+    };
+    const first = start();
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`did not start: ${first.text}`)), 10000);
+      first.stdout.on('data', () => first.text.includes('Dashboard:') && (clearTimeout(t), resolve()));
+    });
+    const info = JSON.parse(fs.readFileSync(path.join(home, 'instance.json'), 'utf8'));
+    eq(info.pid, first.pid);
+    const second = start();
+    eq(await second.done, 0);
+    ok(/already running/.test(second.text) && second.text.includes(`127.0.0.1:${info.port}/?token=`), second.text);
+    eq(first.exitCode, null, 'the first copy keeps running');
+    const r = await request({ host: '127.0.0.1', port: info.port, path: '/api/quit', method: 'POST', headers: { host: `127.0.0.1:${info.port}`, cookie: `cb_token=${info.token}`, 'content-type': 'application/json' } });
+    eq(r.status, 200, r.body);
+    eq(await first.done, 0);
+    ok(!fs.existsSync(path.join(home, 'instance.json')), 'the token file is removed on quit');
+  });
+
+  await test('Windows build: the program is marked as windowed (no console window)', async () => {
+    const { setSubsystem } = require('../scripts/pe-subsystem');
+    for (const magic of [0x10b, 0x20b]) {
+      const buf = Buffer.alloc(512);
+      buf.writeUInt16LE(0x5a4d, 0); // MZ
+      buf.writeUInt32LE(0x80, 0x3c); // where the PE header starts
+      buf.writeUInt32LE(0x00004550, 0x80); // PE\0\0
+      buf.writeUInt16LE(magic, 0x80 + 24);
+      buf.writeUInt16LE(3, 0x80 + 24 + 68); // console
+      eq(setSubsystem(buf, 'gui'), 3);
+      eq(buf.readUInt16LE(0x80 + 24 + 68), 2);
+    }
+    let threw = false;
+    try { setSubsystem(Buffer.from('#!/bin/sh\n'.padEnd(200))); } catch { threw = true; }
+    ok(threw, 'refuses files that are not Windows programs');
   });
 
   api.close();
