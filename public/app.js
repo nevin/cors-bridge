@@ -157,17 +157,7 @@
 
   // ---------------------------------------------------------------- shell
   function logo() {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 40 40');
-    svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor');
-    svg.setAttribute('stroke-width', '2.6');
-    svg.setAttribute('stroke-linecap', 'round');
-    svg.setAttribute('aria-hidden', 'true');
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', 'M3 28h34M7 28c0-9 5-14 13-14s13 5 13 14M12 28v-6M20 28V14M28 28v-6');
-    svg.append(p);
-    return svg;
+    return h('img', { class: 'logo', src: '/logo.svg', alt: '' });
   }
 
   function bridgeStrip() {
