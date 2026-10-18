@@ -1,0 +1,16 @@
+{
+  "name": "cors-bridge",
+  "version": "1.0.0",
+  "description": "Local CORS-fixing reverse proxy with a certificate manager and helpers for the Android emulator and iOS Simulator",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run.js",
+    "build": "node scripts/build-sea.js",
+    "build:all": "node scripts/build-sea.js all"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
