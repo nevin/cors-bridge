@@ -193,6 +193,8 @@ file, so another program cannot swap what gets written.
   `sudo lsof -i :443` on macOS), or give the rule another listen port.
 - *Certificate error in the app:* the CA is not installed on that device, or the app pins certificates.
 - *Nothing in Live log:* the redirect is not applied on that device, or the app was not restarted afterwards.
+- *504 in the app or the Live log:* the real server did not accept a connection within 10 seconds (check your VPN
+  and the server address in the rule), or sent nothing for 120 seconds. Both times can be changed in **Settings**.
 - *Real server certificate not trusted by Node:* the start scripts already trust your OS certificates. Otherwise
   untick "Verify the real server certificate" in the rule, or set `NODE_EXTRA_CA_CERTS` to your company CA file.
 
@@ -206,9 +208,10 @@ npm run app:win      # Windows portable .exe and zips, x64 and ARM (works on a M
 npm run app:all      # both
 ```
 
-Output goes to `dist/app`. The app runs the same code as the command-line program inside Electron, with the window
-locked to the local dashboard (no other sites, no new windows, no browser permissions). Electron's "fuses" are set so
-the packaged app cannot be used as a general Node runtime (`ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` are
+Output goes to `dist/app`. The app runs the same code as the command-line program in a separate engine process
+(`electron/engine.js`, an Electron utility process), so a crash or slow work in the proxy cannot freeze or close the
+window; if the engine stops unexpectedly, the app starts it again and switches the proxy back on. The window is locked to the local dashboard (no other sites, no new windows, no browser
+permissions). Electron's "fuses" are set so the packaged app cannot be used as a general Node runtime (`ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` are
 off) and it checks that its own code archive has not been changed. Icons come from `public/logo.svg`; after changing
 the logo, run `npm run icons` to remake `assets/icon.png`, the tray icons and `assets/logo.svg`.
 
@@ -238,7 +241,7 @@ The macOS ones are signed ad hoc; the Windows ones are unsigned.
 
 ## Tests
 
-`npm test` runs 43 checks: certificates (verified with OpenSSL), the proxy and CORS behaviour, WebSockets, the
+`npm test` runs 47 checks, including connection reuse and the waiting times to the real server: certificates (verified with OpenSSL), the proxy and CORS behaviour, WebSockets, the
 hosts-file editing, dashboard security, import/export, the Android and iOS flows against a fake `adb` and `xcrun`,
 portable mode, the single running copy and Quit. `npm run test:electron` runs the same checks with the Node inside
 Electron (which uses BoringSSL instead of OpenSSL), the way the desktop app runs them.

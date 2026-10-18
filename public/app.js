@@ -1163,6 +1163,8 @@
     const s = S.settings;
     const save = (patch) => act(null, async () => { setState(await api('POST', '/api/settings', patch)); render(); toast('Saved'); });
     const ip = h('input', { type: 'text', value: s.androidHostIp });
+    const connectSec = h('input', { type: 'number', min: 1, max: 120, value: s.connectTimeoutSec, style: 'width:84px' });
+    const answerSec = h('input', { type: 'number', min: 5, max: 3600, value: s.answerTimeoutSec, style: 'width:96px' });
     const lanIps = h('input', { type: 'text', value: (s.lanClients || []).join(', '), placeholder: '192.168.1.20', autocomplete: 'off' });
     return h('div', null,
       h('div', { class: 'panel-head' }, h('div', null, h('h2', null, 'Settings'))),
@@ -1171,7 +1173,13 @@
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.cleanupHostsOnExit, onchange: (e) => save({ cleanupHostsOnExit: e.target.checked }) }), h('span', null, 'Remove this computer\'s hosts redirect when CORS Bridge quits', h('div', { class: 'small muted' }, 'You may be asked for an administrator password again.'))),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.allowLan, onchange: (e) => { if (e.target.checked) { e.target.checked = false; lanIps.focus(); toast('Enter the device IP address, then press Allow.'); } else save({ allowLan: false }); } }), h('span', null, 'Let other devices on my network use the proxy', h('div', { class: 'small muted' }, 'Only needed for a real phone. Only the addresses below get in, and it turns off when CORS Bridge restarts. Those devices reach your real server through your VPN.'))),
         h('label', { class: 'field', style: 'margin-left:24px' }, h('span', null, 'IP addresses of those devices'), h('div', { class: 'inline' }, lanIps, h('button', { class: 'btn', onclick: () => save({ lanClients: lanIps.value, allowLan: true }) }, s.allowLan ? 'Save' : 'Allow')), h('small', null, 'Find it in the phone\'s Wi-Fi settings, for example 192.168.1.20. Separate several with commas.')),
-        h('label', { class: 'field' }, h('span', null, 'Address the Android emulator uses to reach this computer'), h('div', { class: 'inline' }, ip, h('button', { class: 'btn', onclick: () => save({ androidHostIp: ip.value }) }, 'Save')), h('small', null, '10.0.2.2 for the standard emulator.'))),
+        h('label', { class: 'field' }, h('span', null, 'Address the Android emulator uses to reach this computer'), h('div', { class: 'inline' }, ip, h('button', { class: 'btn', onclick: () => save({ androidHostIp: ip.value }) }, 'Save')), h('small', null, '10.0.2.2 for the standard emulator.')),
+        h('div', { class: 'field' }, h('span', { style: 'font-weight:600;display:block;margin-bottom:3px' }, 'How long to wait for the real server'),
+          h('div', { class: 'inline wait' },
+            h('label', null, 'Connecting ', connectSec, ' seconds'),
+            h('label', null, 'Answering ', answerSec, ' seconds'),
+            h('button', { class: 'btn', onclick: () => save({ connectTimeoutSec: Number(connectSec.value), answerTimeoutSec: Number(answerSec.value) }) }, 'Save')),
+          h('small', { style: 'display:block;color:var(--steel);margin-top:3px' }, 'After this, your app gets a clear error (504) instead of waiting. "Answering" counts the time the server sends nothing, so long downloads keep working.'))),
       dataSection());
   }
 

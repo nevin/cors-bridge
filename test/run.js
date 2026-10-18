@@ -341,6 +341,74 @@ function request(opts, body) {
     r = await pna('https://partner.example');
     eq(r.headers['access-control-allow-private-network'], 'true', 'listed origins too');
   });
+  await test('requests reuse one connection to the real server (keep-alive)', async () => {
+    let connections = 0;
+    const onConn = () => connections++;
+    upstream.on('connection', onConn);
+    for (let i = 0; i < 4; i++) {
+      const r = await request({ ...base('api.test.local'), path: `/ka${i}`, method: 'GET', headers: { host: 'api.test.local', origin: 'http://localhost' } });
+      eq(r.status, 200);
+    }
+    upstream.off('connection', onConn);
+    ok(connections <= 1, `expected one connection for four requests, got ${connections}`);
+  });
+  await test('slow or silent real servers end in a clear 504 that the app can read', async () => {
+    const net = require('net');
+    // answers nothing: accepts the request, never replies
+    const silent = http.createServer(() => {});
+    await new Promise((r) => silent.listen(19082, '127.0.0.1', r));
+    // never finishes connecting: accepts TCP but never answers the TLS handshake
+    const stuck = net.createServer((sock) => sock.on('error', () => {}));
+    await new Promise((r) => stuck.listen(19083, '127.0.0.1', r));
+    const saved = store.load();
+    store.save({
+      ...saved,
+      settings: { ...saved.settings, connectTimeoutSec: 0.3, answerTimeoutSec: 0.4 },
+      rules: [
+        ...saved.rules,
+        store.normalizeRule({ hostInput: 'https://silent.test.local:18443', upstreamHost: '127.0.0.1', upstreamScheme: 'http', upstreamPort: 19082 }),
+        store.normalizeRule({ hostInput: 'https://stuck.test.local:18443', upstreamHost: '127.0.0.1', upstreamScheme: 'https', upstreamPort: 19083 }),
+      ],
+    });
+    try {
+      await engine.reload();
+      for (const [host, phrase] of [['silent.test.local', /did not answer in time/], ['stuck.test.local', /could not reach the real server/]]) {
+        const t0 = Date.now();
+        const r = await request({ ...base(host), path: '/slow', method: 'GET', headers: { host, origin: 'capacitor://localhost' } });
+        const took = Date.now() - t0;
+        eq(r.status, 504, `${host}: ${r.body}`);
+        eq(r.headers['access-control-allow-origin'], 'capacitor://localhost', 'the app can read the error');
+        ok(phrase.test(JSON.parse(r.body).error), r.body);
+        ok(took < 3000, `${host} took ${took} ms`);
+      }
+      ok(engine.logs.some((l) => /did not accept a connection within 0.3 s/.test(l.note)) && engine.logs.some((l) => /did not answer within 0.4 s/.test(l.note)), 'the live log says why');
+    } finally {
+      store.save(saved);
+      await engine.reload();
+      silent.closeAllConnections();
+      silent.close();
+      stuck.close();
+    }
+  });
+  await test('a kept-alive connection the server already closed does not fail the next request', async () => {
+    const quick = http.createServer((q, res) => res.end('ok'));
+    quick.keepAliveTimeout = 100; // closes idle connections after 0.1 s
+    await new Promise((r) => quick.listen(19084, '127.0.0.1', r));
+    const saved = store.load();
+    store.save({ ...saved, rules: [...saved.rules, store.normalizeRule({ hostInput: 'https://quick.test.local:18443', upstreamHost: '127.0.0.1', upstreamScheme: 'http', upstreamPort: 19084 })] });
+    try {
+      await engine.reload();
+      for (let i = 0; i < 3; i++) {
+        const r = await request({ ...base('quick.test.local'), path: '/', method: 'GET', headers: { host: 'quick.test.local' } });
+        eq(r.status, 200, `request ${i + 1}: ${r.body}`);
+        await new Promise((res) => setTimeout(res, 250));
+      }
+    } finally {
+      store.save(saved);
+      await engine.reload();
+      quick.close();
+    }
+  });
   await test('a header value Node refuses gives a 500 instead of crashing the app', async () => {
     const good = store.load().rules;
     const broken = good.map((r) => (r.host === 'api.test.local' ? { ...r, cors: { ...r.cors, methods: 'GET\r\nX-Evil: 1' } } : r));
@@ -629,6 +697,16 @@ exit 0
     r = await call('POST', '/api/import', { data: { ...file, rules: [{ host: 'old.test.local', upstreamHost: '198.51.100.10', cors: { origin: 'reflect' } }] }, mode: 'merge' });
     eq(JSON.parse(r.body).state.rules.find((x) => x.host === 'old.test.local').cors.origin, 'app');
     store.save({ ...store.load(), rules: [] });
+  });
+  await test('waiting times can be changed in Settings, within limits', async () => {
+    let r = await call('POST', '/api/settings', { connectTimeoutSec: 0, answerTimeoutSec: 60 });
+    eq(r.status, 400);
+    r = await call('POST', '/api/settings', { connectTimeoutSec: 5, answerTimeoutSec: 30 });
+    eq(r.status, 200, r.body);
+    const st = JSON.parse(r.body).settings;
+    eq(st.connectTimeoutSec, 5);
+    eq(st.answerTimeoutSec, 30);
+    await call('POST', '/api/settings', { connectTimeoutSec: 10, answerTimeoutSec: 120 });
   });
   await test('LAN access needs a list of device addresses', async () => {
     let r = await call('POST', '/api/settings', { allowLan: true, lanClients: '' });
