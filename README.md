@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="380" alt="CORS Bridge"></p>
+
 # CORS Bridge
 
 A small local app that removes CORS errors when you test an app in the **Android emulator** or **iOS Simulator**,

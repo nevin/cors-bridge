@@ -376,6 +376,9 @@ function request(opts, body) {
     const page = await call('GET', '/', null, { cookie: '' });
     eq(page.status, 401);
     ok(/text\/html/.test(page.headers['content-type']) && /Dashboard:/.test(page.body) && /prefers-color-scheme: dark/.test(page.body));
+    ok(page.body.includes('<svg') && page.body.includes('aria-hidden="true"'), 'the logo is built into the page (it cannot load files without the token)');
+    const logo = await call('GET', '/logo.svg');
+    ok(logo.status === 200 && /image\/svg\+xml/.test(logo.headers['content-type']), 'the dashboard serves its logo');
     const j = await call('GET', '/api/state', null, { cookie: '' });
     ok(/Session expired/.test(JSON.parse(j.body).error));
   });
