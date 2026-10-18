@@ -16,31 +16,100 @@ App (simulator) --> CORS Bridge (this computer) --> real server
 
 ## Requirements
 
-- Node.js 18 or newer (https://nodejs.org). Nothing else to install, there are no dependencies.
+- The desktop app and the command-line programs need nothing installed. Running from source needs Node.js 18 or
+  newer (https://nodejs.org); the app itself has no runtime dependencies.
 - Android: Android Studio (for `adb`) and an emulator image labelled **Google APIs** (not "Google Play"), because only
   those allow root.
 - iOS: Xcode with a simulator (macOS only).
 
 ## Start
 
-**Without Node (standalone executable):** run the file for your system from `dist/` (see *Building the executables*).
+**Desktop app (recommended).** Nothing to install. Download the file for your system from the
+[latest release](https://github.com/nevin/cors-bridge/releases/latest) (or take it from `dist/app` after building),
+put it in any folder, also on a USB stick, and open it:
 
-| System | File |
-| --- | --- |
-| Windows (Intel/AMD, ARM) | `cors-bridge-win-x64.exe`, `cors-bridge-win-arm64.exe` |
-| macOS (Apple silicon, Intel) | `cors-bridge-macos-arm64`, `cors-bridge-macos-x64` |
-| Linux (x64, ARM) | `cors-bridge-linux-x64`, `cors-bridge-linux-arm64` |
+| System | File | How to open |
+| --- | --- | --- |
+| Mac with Apple silicon (M1 or later) | `CORS-Bridge-<version>-mac-arm64.zip` | Unzip, then see *Opening the app on macOS* below |
+| Mac with an Intel processor | `CORS-Bridge-<version>-mac-x64.zip` | Unzip, then see *Opening the app on macOS* below |
+| Windows, any PC (Intel/AMD or ARM) | `CORS-Bridge-<version>-windows-portable.exe` | Double-click |
+| Windows, faster start | `CORS-Bridge-<version>-win-x64.zip` (ARM PCs: `-win-arm64.zip`) | Unzip, open `CORS Bridge.exe` |
 
-The executables trust the certificates installed in your operating system for the real server, like the start
-scripts below. Add `--no-open` to stop the browser from opening.
+Not sure which Mac you have? Apple menu > **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel"
+means Intel.
 
-**With Node:**
+The dashboard opens in its own window, and a CORS Bridge icon appears in the menu bar (macOS) or the taskbar tray
+(Windows) with **Start proxy**, **Stop proxy** and **Quit**. Closing the window keeps the proxy running; open it again
+from that icon or by opening the app again. **Quit** (in the icon's menu, in the dashboard, or Cmd+Q) stops the proxy
+and removes the hosts redirect if that is turned on in Settings. Messages go to `cors-bridge.log` in the data folder
+(shown in Settings).
+
+### Opening the app on macOS
+
+CORS Bridge is not signed with an Apple Developer ID yet, so macOS blocks it the first time you open it. You only do
+this once per Mac (and again after downloading a new version):
+
+1. Double-click the downloaded zip. Drag **CORS Bridge.app** into **Applications** (or any other folder; for portable
+   mode, next to your `cors-bridge-data` folder). Do this before the first start, see *Portable mode*.
+2. Double-click **CORS Bridge.app**. macOS says it "Not Opened" or "cannot be opened because Apple cannot check it".
+   Click **Done** (not *Move to Trash*).
+3. Open **System Settings > Privacy & Security**. Scroll down to the message saying CORS Bridge was blocked and click
+   **Open Anyway**. Enter your password, then click **Open Anyway** (or **Open**) once more.
+
+From then on it opens with a double-click. On macOS 14 (Sonoma) and earlier you can instead right-click the app, choose
+**Open**, then **Open** again.
+
+If you are comfortable with Terminal, this does the same in one step (it removes the "downloaded from the internet"
+mark that macOS checks):
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/CORS Bridge.app"
+```
+
+Only do this for a copy you downloaded from this project's GitHub releases. To make sure the download is the original,
+compare its checksum with the one in `SHA256SUMS.txt` on the release page:
+
+```bash
+shasum -a 256 ~/Downloads/CORS-Bridge-*-mac-*.zip
+```
+
+If macOS says the app "is damaged and can't be opened", the download was changed or incomplete: delete it and download
+it again.
+
+### Opening the app on Windows
+
+Windows SmartScreen may show "Windows protected your PC": choose **More info**, then **Run anyway**. This happens because
+the files are not signed with a code-signing certificate yet (see *Building*). To check the download in PowerShell:
+`Get-FileHash .\CORS-Bridge-*-windows-portable.exe` and compare with `SHA256SUMS.txt`. The portable `.exe` unpacks
+itself to a temporary folder each time it starts, so it takes a few seconds; the zip version starts faster.
+
+### Command-line program
+
+For Linux, or if you prefer a terminal: `cors-bridge-linux-x64`, `cors-bridge-macos-arm64`,
+`cors-bridge-win-x64.exe` and the other files in `dist/` after `npm run build:all`. They run in a terminal and open the
+dashboard in your browser. Add `--no-open` to stop the browser from opening, and `--console` to keep messages on the
+terminal even when the output is redirected. Press Ctrl+C or **Quit** in the dashboard to stop.
+
+### Portable mode
+
+Your rules, certificates and private keys are normally kept in `~/.cors-bridge`
+(`%USERPROFILE%\.cors-bridge` on Windows). To keep them next to the app instead, for example on a USB stick, create a
+folder named `cors-bridge-data` in the same folder as the app (next to `CORS Bridge.app` on macOS, next to the `.exe`
+on Windows) and start the app. Settings shows which folder is in use. Keep in mind that this folder then holds your CA
+private key: anyone who copies it can read the traffic of every simulator that trusts your CA, so keep it on a drive
+only you use. On macOS, move the app out of the folder you unzipped it in (or into Applications) first; otherwise
+macOS runs it from a temporary copy and the folder next to it cannot be found. `CORS_BRIDGE_HOME` overrides both.
+
+### Running from source (with Node)
+
 
 - Windows: double-click `start.bat`
 - macOS: double-click `start.command` (or run `./start.command` in a terminal)
 - Anywhere: `node server.js`
 
-A browser tab opens with the dashboard. Keep the terminal window open while you test.
+A browser tab opens with the dashboard. Keep the terminal window open while you test, or press **Quit** in the
+dashboard. With Node, portable mode uses a `cors-bridge-data` folder in the project folder. To run the desktop app from
+source: `npm install`, then `npm run app`.
 
 ## Use
 
@@ -127,7 +196,34 @@ file, so another program cannot swap what gets written.
 - *Real server certificate not trusted by Node:* the start scripts already trust your OS certificates. Otherwise
   untick "Verify the real server certificate" in the rule, or set `NODE_EXTRA_CA_CERTS` to your company CA file.
 
-## Building the executables
+## Building
+
+**Desktop app** (Electron, built with electron-builder; run `npm install` once):
+
+```
+npm run app:mac      # macOS zips, Apple silicon and Intel (on a Mac)
+npm run app:win      # Windows portable .exe and zips, x64 and ARM (works on a Mac too)
+npm run app:all      # both
+```
+
+Output goes to `dist/app`. The app runs the same code as the command-line program inside Electron, with the window
+locked to the local dashboard (no other sites, no new windows, no browser permissions). Electron's "fuses" are set so
+the packaged app cannot be used as a general Node runtime (`ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` are
+off) and it checks that its own code archive has not been changed. Icons come from `public/logo.svg`; after changing
+the logo, run `npm run icons` to remake `assets/icon.png`, the tray icons and `assets/logo.svg`.
+
+Signing before sharing the files:
+
+- **macOS:** the build is signed ad hoc, which runs on your own Mac; on other Macs people use right-click > Open once.
+  To distribute without that, sign with an Apple Developer ID, set `"hardenedRuntime": true` under `build.mac` in
+  `package.json`, and notarize.
+- **Windows:** the `.exe` files are unsigned, so SmartScreen warns. Sign them with your company's code-signing
+  certificate (electron-builder reads it from `CSC_LINK` / `CSC_KEY_PASSWORD`).
+
+Rebuild when Electron publishes security updates (`npm install --save-exact --save-dev electron@<version>`), the same
+way you would update Node.
+
+**Command-line programs** (Node "single executable", no npm packages needed):
 
 ```
 npm run build        # this computer only
@@ -135,20 +231,14 @@ npm run build:all    # all six (macOS ones only when building on a Mac)
 ```
 
 Output goes to `dist/`. Each executable contains the Node version that runs the build, so build with a supported LTS
-release (currently Node 22). The script bundles `server.js` and `lib/`, embeds `public/`, and injects them into Node
-with `postject` (fetched through `npx`). For other platforms it downloads the official Node build from nodejs.org and
-checks it against `SHASUMS256.txt`; downloads are cached in `build/node-cache`.
-
-Signing before sharing the files:
-
-- **macOS:** the build signs ad hoc, which runs on your own Mac. A copy downloaded on another Mac is blocked by
-  Gatekeeper until you right-click > Open (or `xattr -d com.apple.quarantine <file>`). To distribute properly, sign with
-  a Developer ID and notarize.
-- **Windows:** injecting breaks Node's own signature, so the `.exe` is unsigned and SmartScreen may warn. Sign it with
-  your company's code-signing certificate (`signtool sign ...`).
-- **Linux:** nothing needed; `chmod +x` if the permission was lost in transfer.
+release, for example `npx -y node@24 scripts/build-sea.js all`. The script bundles `server.js` and `lib/`, embeds
+`public/`, and injects them into Node with `postject` (fetched through `npx`). For other platforms it downloads the
+official Node build from nodejs.org and checks it against `SHASUMS256.txt`; downloads are cached in `build/node-cache`.
+The macOS ones are signed ad hoc; the Windows ones are unsigned.
 
 ## Tests
 
-`npm test` runs 21 checks: certificates (verified with OpenSSL), the proxy and CORS behaviour, WebSockets, the
-hosts-file editing, dashboard security and the Android flow against a fake `adb`.
+`npm test` runs 43 checks: certificates (verified with OpenSSL), the proxy and CORS behaviour, WebSockets, the
+hosts-file editing, dashboard security, import/export, the Android and iOS flows against a fake `adb` and `xcrun`,
+portable mode, the single running copy and Quit. `npm run test:electron` runs the same checks with the Node inside
+Electron (which uses BoringSSL instead of OpenSSL), the way the desktop app runs them.

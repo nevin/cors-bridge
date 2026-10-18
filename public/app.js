@@ -102,7 +102,7 @@
   };
 
   function setOffline(kind) {
-    if (ui.offline === kind) return;
+    if (ui.quit || ui.offline === kind) return;
     const was = ui.offline;
     ui.offline = kind;
     if (kind === 'down') pollUntilBack();
@@ -202,8 +202,30 @@
     return h('div', { class: 'notice bad banner', role: 'alert' }, h('strong', null, 'CORS Bridge is not running.'), h('div', { class: 'small' }, 'Start it again (start.command, start.bat or node server.js). This page reconnects by itself.'));
   }
 
+  // ---------------------------------------------------------------- quit
+  async function quitApp(e) {
+    await act(e.target, async () => {
+      const out = await api('POST', '/api/quit');
+      ui.quit = out;
+      if (ui.es) ui.es.close();
+      render();
+    });
+  }
+
+  function quitScreen() {
+    return h('div', { class: 'shell' },
+      h('div', { class: 'card quit' },
+        h('div', { class: 'brand' }, logo(), h('h1', null, 'CORS Bridge has quit')),
+        ui.quit.removesRedirect ? h('p', null, 'The hosts-file redirect is being removed. You may be asked for your administrator password.') : null,
+        h('p', null, 'You can close this tab. To start CORS Bridge again, open the app.')));
+  }
+
   function render() {
     const app = document.getElementById('app');
+    if (ui.quit) {
+      app.replaceChildren(quitScreen());
+      return;
+    }
     if (!S) {
       app.replaceChildren(h('div', { class: 'shell' }, offlineBanner()));
       return;
@@ -235,7 +257,8 @@
               ? null
               : running
               ? h('button', { class: 'btn', onclick: (e) => act(e.target, async () => { setState(await api('POST', '/api/proxy/stop')); render(); }) }, 'Stop proxy')
-              : startButton()
+              : startButton(),
+            !ui.offline && S.platform.canQuit ? h('button', { class: 'btn', title: 'Stop CORS Bridge completely. The hosts redirect is removed if that is turned on in Settings.', onclick: quitApp }, 'Quit') : null
           )
         ),
         offlineBanner(),
@@ -1092,6 +1115,11 @@
   let rulesRedraw = null;
   function startEvents() {
     const es = new EventSource('/api/events');
+    ui.es = es;
+    // The proxy was started or stopped somewhere else (the tray menu, another tab): show the new state.
+    es.addEventListener('status', () => {
+      if (!ui.quit) refresh().catch(() => {});
+    });
     es.onopen = () => {
       if (ui.offline) setOffline(null);
     };
@@ -1144,7 +1172,20 @@
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.allowLan, onchange: (e) => { if (e.target.checked) { e.target.checked = false; lanIps.focus(); toast('Enter the device IP address, then press Allow.'); } else save({ allowLan: false }); } }), h('span', null, 'Let other devices on my network use the proxy', h('div', { class: 'small muted' }, 'Only needed for a real phone. Only the addresses below get in, and it turns off when CORS Bridge restarts. Those devices reach your real server through your VPN.'))),
         h('label', { class: 'field', style: 'margin-left:24px' }, h('span', null, 'IP addresses of those devices'), h('div', { class: 'inline' }, lanIps, h('button', { class: 'btn', onclick: () => save({ lanClients: lanIps.value, allowLan: true }) }, s.allowLan ? 'Save' : 'Allow')), h('small', null, 'Find it in the phone\'s Wi-Fi settings, for example 192.168.1.20. Separate several with commas.')),
         h('label', { class: 'field' }, h('span', null, 'Address the Android emulator uses to reach this computer'), h('div', { class: 'inline' }, ip, h('button', { class: 'btn', onclick: () => save({ androidHostIp: ip.value }) }, 'Save')), h('small', null, '10.0.2.2 for the standard emulator.'))),
-      h('p', { class: 'muted small', style: 'margin-top:14px' }, 'Your data (rules, certificates and private keys) is stored in ', h('code', null, S.platform.dataDir), '.'));
+      dataSection());
+  }
+
+  function dataSection() {
+    const p = S.platform;
+    return h('section', { class: 'section', style: 'margin-top:24px' },
+      h('h3', { style: 'margin-bottom:8px' }, 'Where your data is kept', p.portable ? h('span', { class: 'chip span group-chip' }, 'Portable mode') : null),
+      h('div', { class: 'card', style: 'padding:14px 16px' },
+        h('p', { class: 'small' }, 'Rules, certificates and private keys are in ', h('code', null, p.dataDir), '.'),
+        p.portable
+          ? h('p', { class: 'small' }, 'This folder sits next to the app, so it travels with it (for example on a USB stick). Anyone who copies it gets your CA private key and could read the traffic of every simulator that trusts that CA. Keep it on a drive only you use.')
+          : h('p', { class: 'small muted' }, 'To keep everything next to the app instead (portable mode): quit CORS Bridge, create a folder named ', h('code', null, p.portableName), ' in ', h('code', null, p.appFolder), ', move the contents of the folder above into it if you want to keep your rules, then open CORS Bridge again.'),
+        p.translocated ? h('div', { class: 'notice warn' }, h('strong', null, 'macOS is running this app from a temporary copy.'), h('div', { class: 'small' }, 'A portable folder next to the app cannot be found this way. Move the app to another folder in Finder (for example Applications or your USB drive), then open it again.')) : null,
+        h('p', { class: 'small muted', style: 'margin:0' }, 'When CORS Bridge runs without a terminal window, its messages are written to ', h('code', null, p.logFile), '.')));
   }
 
   function helpPanel() {

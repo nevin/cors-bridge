@@ -6,6 +6,9 @@
 //   node scripts/build-sea.js win-x64 linux-x64 darwin-arm64
 //   node scripts/build-sea.js all
 //
+// These are the command-line programs (run in a terminal, dashboard in the browser). The desktop app with its own
+// window is built with electron-builder instead: npm run app:mac / app:win.
+//
 // Every binary contains the Node version that runs this script. Binaries for other platforms are made from the
 // official Node download for that platform (checked against nodejs.org's SHASUMS256.txt). macOS binaries must be
 // built on a Mac, because they have to be code-signed to run.
